@@ -5,6 +5,26 @@
     <BuiltBinary Include="$(TargetPath)" />
   </ItemGroup>
 
+  <Target Name="DeployToSymStore"
+          BeforeTargets="PostBuildEvent" 
+          DependsOnTargets="_DeployToSymStoreSetProperties;_DeployPortableSymbolsToSymStore;_DeployWindowsSymbolsToSymStore" />
+    
+  <Target Name="_DeployToSymStoreSetProperties">
+
+    <PropertyGroup>
+      <_TargetPdbPath />
+      <_TargetPdbPath Condition="'$(DebugType)' != 'embedded'">$([System.IO.Path]::ChangeExtension($(TargetPath), '.pdb'))</_TargetPdbPath>
+      <_BuildsPortablePdb>false</_BuildsPortablePdb>
+      <_BuildsPortablePdb Condition="'$(DebugType)' == 'portable' or '$(DebugType)' == 'embedded'">true</_BuildsPortablePdb>
+
+      <_SymStoreOutputDir>$(ArtifactsSymStoreDirectory)$(MSBuildProjectName)\$(TargetFramework)\</_SymStoreOutputDir>
+      <_SymStorePdbPath>$(_SymStoreOutputDir)$(TargetName).pdb</_SymStorePdbPath>
+
+      <!-- By default publish Windows PDBs only for shipping components -->
+      <PublishWindowsPdb Condition="'$(PublishWindowsPdb)' == '' and '$(IsShippingAssembly)' == 'true' and Exists('$(TargetPath)') and ('$(DebugType)' == 'embedded' or Exists('$(_TargetPdbPath)'))">true</PublishWindowsPdb>
+    </PropertyGroup>
+  </Target>
+
   <!-- Target used to consolidate all PDBs into a single location -->
   <Target Name="MoveSymbolFiles"
           AfterTargets="Build"
