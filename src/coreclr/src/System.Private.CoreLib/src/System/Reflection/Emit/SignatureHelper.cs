@@ -724,15 +724,13 @@ namespace System.Reflection.Emit
                 temp[sigCopyIndex++] = (byte)(argCount & 0xFF);
             else if (argCount <= 0x3FFF)
             {
-                temp[sigCopyIndex++] = (byte)((argCount >> 8) | 0x80);
-                temp[sigCopyIndex++] = (byte)(argCount & 0xFF);
+                BinaryPrimitives.WriteInt16BigEndian(temp, (short)(argCount | 0x80_00));
+                sigCopyIndex += 2;
             }
             else if (argCount <= 0x1FFFFFFF)
             {
-                temp[sigCopyIndex++] = (byte)((argCount >> 24) | 0xC0);
-                temp[sigCopyIndex++] = (byte)((argCount >> 16) & 0xFF);
-                temp[sigCopyIndex++] = (byte)((argCount >> 8) & 0xFF);
-                temp[sigCopyIndex++] = (byte)(argCount & 0xFF);
+                BinaryPrimitives.WriteInt32BigEndian(temp, (int)(argCount | 0xC0_00_00_00));
+                sigCopyIndex += 4;
             }
             else
                 throw new ArgumentException(SR.Argument_LargeInteger);

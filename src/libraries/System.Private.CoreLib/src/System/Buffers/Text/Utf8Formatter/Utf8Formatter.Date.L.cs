@@ -27,6 +27,9 @@ namespace System.Buffers.Text
 
             uint dayAbbrev = s_dayAbbreviationsLowercase[(int)value.DayOfWeek];
 
+            // Perhaps static array of constant assignments and overwrite
+            // Perhaps BinaryPrimitives.WriteInt32LittleEndian and overwrite dest[3] with Comma?
+
             destination[0] = (byte)dayAbbrev;
             dayAbbrev >>= 8;
             destination[1] = (byte)dayAbbrev;
