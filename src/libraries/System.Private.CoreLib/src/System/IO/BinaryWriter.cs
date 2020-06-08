@@ -309,25 +309,19 @@ namespace System.IO
                 return;
             }
 
-            int maxChars = encodedChars.Length / _encoding.GetMaxByteCount(1);
-
             int charStart = 0;
-            int numLeft = value.Length;
 
-            while (numLeft > 0)
+            while (len > 0)
             {
-                int charCount = (numLeft > maxChars) ? maxChars : numLeft;
-
-                if (charStart < 0 || charCount < 0 || charStart > value.Length - charCount)
+                _encoder.Convert(value.Slice(charStart), encodedChars, false, out int charCount, out int byteCount, out bool completed);
+                if (completed)
                 {
-                    throw new ArgumentOutOfRangeException(nameof(value));
+                    _encoder.Reset();
                 }
 
-                int byteLen = _encoder.GetBytes(value.Slice(charStart, charCount), encodedChars, charCount == numLeft);
-
-                OutStream.Write(encodedChars.Slice(0, byteLen));
+                OutStream.Write(encodedChars.Slice(0, byteCount));
                 charStart += charCount;
-                numLeft -= charCount;
+                len -= byteCount;
             }
         }
 
