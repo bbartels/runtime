@@ -7,6 +7,8 @@ using System.Diagnostics;
 using System.Buffers;
 using System.Threading.Tasks;
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace System.IO
 {
@@ -25,11 +27,7 @@ namespace System.IO
 
         private readonly bool _leaveOpen;
 
-        // Perf optimization stuff
-        private byte[]? _largeByteBuffer;  // temp space for writing chars.
-        private int _maxChars;   // max # of chars we can put in _largeByteBuffer
         // Size should be around the max number of chars/string * Encoding's max bytes/char
-        private const int LargeByteBufferSize = 256;
 
         // Protected default constructor that sets the output stream
         // to a null stream (a bit bucket).
@@ -175,17 +173,14 @@ namespace System.IO
         // advanced by two.
         // Note this method cannot handle surrogates properly in UTF-8.
         //
-        public virtual unsafe void Write(char ch)
+        public virtual void Write(char ch)
         {
             if (char.IsSurrogate(ch))
                 throw new ArgumentException(SR.Arg_SurrogatesNotAllowedAsSingleChar);
 
             Debug.Assert(_encoding.GetMaxByteCount(1) <= 16, "_encoding.GetMaxByteCount(1) <= 16)");
-            int numBytes = 0;
-            fixed (byte* pBytes = &_buffer[0])
-            {
-                numBytes = _encoder.GetBytes(&ch, 1, pBytes, _buffer.Length, flush: true);
-            }
+
+            int numBytes = _encoder.GetBytes(MemoryMarshal.CreateReadOnlySpan(ref ch, 1), _buffer, flush: true);
             OutStream.Write(_buffer, 0, numBytes);
         }
 
@@ -194,25 +189,14 @@ namespace System.IO
         // This default implementation calls the Write(Object, int, int)
         // method to write the character array.
         //
-        public virtual void Write(char[] chars)
-        {
-            if (chars == null)
-                throw new ArgumentNullException(nameof(chars));
-
-            byte[] bytes = _encoding.GetBytes(chars, 0, chars.Length);
-            OutStream.Write(bytes, 0, bytes.Length);
-        }
+        public virtual void Write(char[] chars) => WriteChars(chars, false);
 
         // Writes a section of a character array to this stream.
         //
         // This default implementation calls the Write(Object, int, int)
         // method to write the character array.
         //
-        public virtual void Write(char[] chars, int index, int count)
-        {
-            byte[] bytes = _encoding.GetBytes(chars, index, count);
-            OutStream.Write(bytes, 0, bytes.Length);
-        }
+        public virtual void Write(char[] chars, int index, int count) => WriteChars(chars.AsSpan(index, count), false);
 
         // Writes a double to this stream. The current position of the stream is
         // advanced by eight.
@@ -297,73 +281,53 @@ namespace System.IO
             OutStream.Write(_buffer, 0, 4);
         }
 
-
         // Writes a length-prefixed string to this stream in the BinaryWriter's
         // current Encoding. This method first writes the length of the string as
         // a four-byte unsigned integer, and then writes that many characters
         // to the stream.
         //
-        public virtual unsafe void Write(string value)
+        public virtual void Write(string value) => WriteChars(value, true);
+
+        [SkipLocalsInit]
+        private void WriteChars(ReadOnlySpan<char> value, bool isString)
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value));
 
             int len = _encoding.GetByteCount(value);
-            Write7BitEncodedInt(len);
-
-            if (_largeByteBuffer == null)
+            if (isString)
             {
-                _largeByteBuffer = new byte[LargeByteBufferSize];
-                _maxChars = _largeByteBuffer.Length / _encoding.GetMaxByteCount(1);
+                Write7BitEncodedInt(len);
             }
 
-            if (len <= _largeByteBuffer.Length)
+            Span<byte> encodedChars = stackalloc byte[512];
+
+            if (len <= 512)
             {
-                _encoding.GetBytes(value, 0, value.Length, _largeByteBuffer, 0);
-                OutStream.Write(_largeByteBuffer, 0, len);
+                _encoding.GetBytes(value, encodedChars);
+                OutStream.Write(encodedChars.Slice(0, len));
+                return;
             }
-            else
+
+            int maxChars = encodedChars.Length / _encoding.GetMaxByteCount(1);
+
+            int charStart = 0;
+            int numLeft = value.Length;
+
+            while (numLeft > 0)
             {
-                // Aggressively try to not allocate memory in this loop for
-                // runtime performance reasons.  Use an Encoder to write out
-                // the string correctly (handling surrogates crossing buffer
-                // boundaries properly).
-                int charStart = 0;
-                int numLeft = value.Length;
-#if DEBUG
-                int totalBytes = 0;
-#endif
-                while (numLeft > 0)
+                int charCount = (numLeft > maxChars) ? maxChars : numLeft;
+
+                if (charStart < 0 || charCount < 0 || charStart > value.Length - charCount)
                 {
-                    // Figure out how many chars to process this round.
-                    int charCount = (numLeft > _maxChars) ? _maxChars : numLeft;
-                    int byteLen;
-
-                    checked
-                    {
-                        if (charStart < 0 || charCount < 0 || charStart > value.Length - charCount)
-                        {
-                            throw new ArgumentOutOfRangeException(nameof(value));
-                        }
-                        fixed (char* pChars = value)
-                        {
-                            fixed (byte* pBytes = &_largeByteBuffer[0])
-                            {
-                                byteLen = _encoder.GetBytes(pChars + charStart, charCount, pBytes, _largeByteBuffer.Length, charCount == numLeft);
-                            }
-                        }
-                    }
-#if DEBUG
-                    totalBytes += byteLen;
-                    Debug.Assert(totalBytes <= len && byteLen <= _largeByteBuffer.Length, "BinaryWriter::Write(String) - More bytes encoded than expected!");
-#endif
-                    OutStream.Write(_largeByteBuffer, 0, byteLen);
-                    charStart += charCount;
-                    numLeft -= charCount;
+                    throw new ArgumentOutOfRangeException(nameof(value));
                 }
-#if DEBUG
-                Debug.Assert(totalBytes == len, "BinaryWriter::Write(String) - Didn't write out all the bytes!");
-#endif
+
+                int byteLen = _encoder.GetBytes(value.Slice(charStart, charCount), encodedChars, charCount == numLeft);
+
+                OutStream.Write(encodedChars.Slice(0, byteLen));
+                charStart += charCount;
+                numLeft -= charCount;
             }
         }
 
