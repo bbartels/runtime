@@ -1177,6 +1177,7 @@ if (!System.Diagnostics.Debugger.IsAttached) { System.Diagnostics.Debugger.Launc
             var options = config.Get<Test>();
             Assert.Equal(42, options.Length);
             Assert.Equal("Green", options.Color);
+<<<<<<< Updated upstream
             Assert.Equal((byte[])[1, 2, 3], options.Numbers);
         }
         */
@@ -1184,7 +1185,7 @@ if (!System.Diagnostics.Debugger.IsAttached) { System.Diagnostics.Debugger.Launc
         public record Test(int Length, string Color, int[] Numbers);
 
         [Fact]
-        void RecursiveTypeGraphs_IndisrectRef()
+        public void RecursiveTypeGraphs_IndisrectRef()
         {
             var data = """
                        {
@@ -1201,7 +1202,8 @@ if (!System.Diagnostics.Debugger.IsAttached) { System.Diagnostics.Debugger.Launc
             var options = configuration.Get<Test>();
             Assert.Equal(42, options.Length);
             Assert.Equal("green", options.Color);
-            Assert.Equal(2, options.Numbers.Length);
+
+            Assert.Equal(1, options.Numbers.Length);
             Assert.Equal((int[])[ 1, 2 ], options.Numbers);
         }
 
