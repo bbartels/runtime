@@ -1158,6 +1158,53 @@ if (!System.Diagnostics.Debugger.IsAttached) { System.Diagnostics.Debugger.Launc
             Assert.Equal("hello world", options.MyString);
         }
 
+
+        /*
+        [Fact]
+        public void CanBindImmutableClassWithSequenceWithoutDefault()
+        {
+            byte[] numbers = [1, 2, 3];
+            var dic = new Dictionary<string, string>
+            {
+                {"Length", "42"},
+                {"Color", "Green"},
+                { "Numbers", Convert.ToBase64String(numbers) }
+            };
+            var configurationBuilder = new ConfigurationBuilder();
+            configurationBuilder.AddInMemoryCollection(dic);
+            var config = configurationBuilder.Build();
+
+            var options = config.Get<Test>();
+            Assert.Equal(42, options.Length);
+            Assert.Equal("Green", options.Color);
+            Assert.Equal((byte[])[1, 2, 3], options.Numbers);
+        }
+        */
+
+        public record Test(int Length, string Color, int[] Numbers);
+
+        [Fact]
+        void RecursiveTypeGraphs_IndisrectRef()
+        {
+            var data = """
+                       {
+                           "length": 42,
+                           "color": "green",
+                           "numbers": [ 1, 2 ]
+                       }
+                       """;
+
+            var configuration = new ConfigurationBuilder()
+                .AddJsonStream(TestStreamHelpers.StringToStream(data))
+                .Build();
+
+            var options = configuration.Get<Test>();
+            Assert.Equal(42, options.Length);
+            Assert.Equal("green", options.Color);
+            Assert.Equal(2, options.Numbers.Length);
+            Assert.Equal((int[])[ 1, 2 ], options.Numbers);
+        }
+
         [Fact]
         public void CanBindImmutableClass()
         {

@@ -18,9 +18,9 @@ namespace Microsoft.Extensions.Configuration.Binder.SourceGeneration
                 }
 
                 EmitBindingExtStartRegion(Identifier.IConfiguration);
-                EmitGetMethods();
-                EmitGetValueMethods();
-                EmitBindMethods_ConfigurationBinder();
+                //EmitGetMethods();
+                //EmitGetValueMethods();
+                //EmitBindMethods_ConfigurationBinder();
                 EmitBindingExtEndRegion();
             }
 
