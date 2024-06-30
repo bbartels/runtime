@@ -218,7 +218,7 @@ namespace Microsoft.Extensions.Configuration
 
         [RequiresDynamicCode(DynamicCodeWarningMessage)]
         [RequiresUnreferencedCode(PropertyTrimmingWarningMessage)]
-        private static void BindProperties(object instance, IConfiguration configuration, BinderOptions options)
+        private static void BindProperties(object instance, IConfiguration configuration, BinderOptions options, HashSet<ParameterInfo> boundByConstructor)
         {
             List<PropertyInfo> modelProperties = GetAllProperties(instance.GetType());
 
@@ -399,7 +399,7 @@ namespace Microsoft.Extensions.Configuration
                     }
                     else
                     {
-                        bindingPoint.SetValue(CreateInstance(type, config, options));
+                        bindingPoint.SetValue(CreateInstance(type, config, options).Item1);
                     }
                 }
 
@@ -422,7 +422,7 @@ namespace Microsoft.Extensions.Configuration
                     }
                     else
                     {
-                        BindProperties(bindingPoint.Value, config, options);
+                        BindProperties(bindingPoint.Value, config, options, );
                     }
                 }
             }
@@ -430,8 +430,7 @@ namespace Microsoft.Extensions.Configuration
             {
                 if (isParentCollection && bindingPoint.Value is null && string.IsNullOrEmpty(configValue))
                 {
-                    // If we don't have an instance, try to create one
-                    bindingPoint.TrySetValue(CreateInstance(type, config, options));
+                    bindingPoint.TrySetValue(CreateInstance(type, config, options).Item1);
                 }
             }
         }
@@ -439,7 +438,7 @@ namespace Microsoft.Extensions.Configuration
         [RequiresDynamicCode(DynamicCodeWarningMessage)]
         [RequiresUnreferencedCode(
             "In case type is a Nullable<T>, cannot statically analyze what the underlying type is so its members may be trimmed.")]
-        private static object CreateInstance(
+        private static (object, HashSet<ParameterInfo>) CreateInstance(
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors |
                                         DynamicallyAccessedMemberTypes.NonPublicConstructors)]
             Type type,
@@ -488,12 +487,15 @@ namespace Microsoft.Extensions.Configuration
 
                 object?[] parameterValues = new object?[parameters.Length];
 
+                HashSet<ParameterInfo> boundParameters = new HashSet<ParameterInfo>();
+
                 for (int index = 0; index < parameters.Length; index++)
                 {
                     parameterValues[index] = BindParameter(parameters[index], type, config, options);
+                    boundParameters.Add(parameters[index]);
                 }
 
-                return constructor.Invoke(parameterValues);
+                return (constructor.Invoke(parameterValues), new HashSet<ParameterInfo>());
             }
 
             object? instance;
@@ -506,7 +508,7 @@ namespace Microsoft.Extensions.Configuration
                 throw new InvalidOperationException(SR.Format(SR.Error_FailedToActivate, type), ex);
             }
 
-            return instance ?? throw new InvalidOperationException(SR.Format(SR.Error_FailedToActivate, type));
+            return (instance ?? throw new InvalidOperationException(SR.Format(SR.Error_FailedToActivate, type)), new HashSet<ParameterInfo>());
         }
 
         private static bool DoAllParametersHaveEquivalentProperties(ParameterInfo[] parameters,

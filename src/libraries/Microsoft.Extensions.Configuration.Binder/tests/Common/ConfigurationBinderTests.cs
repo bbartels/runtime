@@ -1177,7 +1177,6 @@ if (!System.Diagnostics.Debugger.IsAttached) { System.Diagnostics.Debugger.Launc
             var options = config.Get<Test>();
             Assert.Equal(42, options.Length);
             Assert.Equal("Green", options.Color);
-<<<<<<< Updated upstream
             Assert.Equal((byte[])[1, 2, 3], options.Numbers);
         }
         */
