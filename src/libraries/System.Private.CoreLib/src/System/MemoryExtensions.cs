@@ -3643,7 +3643,7 @@ namespace System
            where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator);
         public static SpanSplitEnumerator<T> Split<T>(this ReadOnlySpan<T> source, ReadOnlySpan<T> separator)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator, treatAsSingleSeparator: true);
-        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, ReadOnlySpan<T> separators)
+        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, [System.Diagnostics.CodeAnalysis.UnscopedRef] params ReadOnlySpan<T> separators)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators, treatAsSingleSeparator: false);
         public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, SearchValues<T> separators)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators);
