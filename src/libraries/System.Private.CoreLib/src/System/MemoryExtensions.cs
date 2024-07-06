@@ -3639,6 +3639,15 @@ namespace System
             Debug.Assert(span.Length == other.Length);
         }
 
+        public static SpanSplitEnumerator<T> Split<T>(this ReadOnlySpan<T> source, T separator)
+           where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator);
+        public static SpanSplitEnumerator<T> Split<T>(this ReadOnlySpan<T> source, ReadOnlySpan<T> separator)
+            where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator, treatAsSingleSeparator: true);
+        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, ReadOnlySpan<T> separators)
+            where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators, treatAsSingleSeparator: false);
+        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, SearchValues<T> separators)
+            where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators);
+
         /// <summary>
         /// Parses the source <see cref="ReadOnlySpan{Char}"/> for the specified <paramref name="separator"/>, populating the <paramref name="destination"/> span
         /// with <see cref="Range"/> instances representing the regions between the separators.
@@ -4662,6 +4671,93 @@ namespace System
             {
                 _success = false;
                 return false;
+            }
+        }
+
+        public ref struct SpanSplitEnumerator<T> where T : IEquatable<T>
+        {
+            private enum SplitMode
+            {
+                None = 0,
+                SingleToken,
+                Sequence,
+                Any,
+                SearchValues
+            }
+
+            private readonly ReadOnlySpan<T> _buffer;
+
+            private readonly ReadOnlySpan<T> _separators;
+            private readonly T _separator = default!;
+            private readonly ReadOnlySpan<T> _spanSeparator;
+            private readonly SearchValues<T> _searchValues = default!;
+
+            private readonly int _separatorLength;
+            private readonly SplitMode _splitMode;
+
+            private readonly bool _isInitialized = true;
+
+            private int _startCurrent = 0;
+            private int _endCurrent = 0;
+            private int _startNext = 0;
+
+            public SpanSplitEnumerator<T> GetEnumerator() => this;
+
+            public Range Current => new Range(_startCurrent, _endCurrent);
+
+            internal SpanSplitEnumerator(ReadOnlySpan<T> span, SearchValues<T> searchValues)
+            {
+                _buffer = span;
+                _separatorLength = 1;
+                _splitMode = SplitMode.SearchValues;
+                _searchValues = searchValues;
+            }
+
+            internal SpanSplitEnumerator(ReadOnlySpan<T> span, ReadOnlySpan<T> separator, bool treatAsSingleSeparator)
+            {
+                _buffer = span;
+                _separators = treatAsSingleSeparator ? default : separator;
+                _spanSeparator = treatAsSingleSeparator ? separator : default;
+                _separatorLength = (_separators.Length, treatAsSingleSeparator) switch
+                {
+                    (0, true) or (_, false) => 1,
+                    (_, true) => separator.Length,
+                };
+                _splitMode = treatAsSingleSeparator ? SplitMode.Sequence : SplitMode.Any;
+            }
+
+            internal SpanSplitEnumerator(ReadOnlySpan<T> span, T separator)
+            {
+                _buffer = span;
+                _separator = separator;
+                _separatorLength = 1;
+                _splitMode = SplitMode.SingleToken;
+            }
+
+            public bool MoveNext()
+            {
+                if (!_isInitialized || _startNext > _buffer.Length)
+                {
+                    return false;
+                }
+
+                ReadOnlySpan<T> slice = _buffer[_startNext..];
+                _startCurrent = _startNext;
+
+                int separatorIndex = _splitMode switch
+                {
+                    SplitMode.SingleToken => slice.IndexOf(_separator),
+                    SplitMode.Sequence => slice.IndexOf(_spanSeparator),
+                    SplitMode.Any => slice.IndexOfAny(_separators),
+                    SplitMode.SearchValues => _searchValues.IndexOfAny(_buffer),
+                    _ => throw new UnreachableException()
+                };
+
+                int elementLength = (separatorIndex != -1 ? separatorIndex : slice.Length);
+
+                _endCurrent = _startCurrent + elementLength;
+                _startNext = _endCurrent + _separatorLength;
+                return true;
             }
         }
     }
