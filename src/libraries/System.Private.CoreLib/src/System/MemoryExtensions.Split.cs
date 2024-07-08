@@ -2,17 +2,49 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 using System.Buffers;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace System
 {
     public static partial class MemoryExtensions
     {
+        /// <summary>
+        /// Returns a type that allows for enumeration of each element within a split span
+        /// using the provided separator character.
+        /// </summary>
+        /// <param name="source">The source span to be enumerated.</param>
+        /// <param name="separator">The separator character to be used to split the provided span.</param>
+        /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/>.</returns>
         public static SpanSplitEnumerator<T> Split<T>(this ReadOnlySpan<T> source, T separator)
            where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator);
+
+        /// <summary>
+        /// Returns a type that allows for enumeration of each element within a split span
+        /// using the provided separator span.
+        /// </summary>
+        /// <param name="source">The source span to be enumerated.</param>
+        /// <param name="separator">The separator span to be used to split the provided span.</param>
+        /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/>.</returns>
         public static SpanSplitEnumerator<T> Split<T>(this ReadOnlySpan<T> source, ReadOnlySpan<T> separator)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separator, treatAsSingleSeparator: true);
-        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, [System.Diagnostics.CodeAnalysis.UnscopedRef] params ReadOnlySpan<T> separators)
+
+        /// <summary>
+        /// Returns a type that allows for enumeration of each element within a split span
+        /// using any of the provided elements.
+        /// </summary>
+        /// <param name="source">The source span to be enumerated.</param>
+        /// <param name="separators">The separators to be used to split the provided span.</param>
+        /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/>.</returns>
+        public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, [UnscopedRef] params ReadOnlySpan<T> separators)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators, treatAsSingleSeparator: false);
+
+        /// <summary>
+        /// Returns a type that allows for enumeration of each element within a split span
+        /// using the provided <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/>.
+        /// </summary>
+        /// <param name="source">The source span to be enumerated.</param>
+        /// <param name="separators">The <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/> to be used to split the provided span.</param>
+        /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/>.</returns>
         public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, SearchValues<T> separators)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators);
 
@@ -26,6 +58,10 @@ namespace System
             SearchValues
         }
 
+        /// <summary>
+        /// <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/> allows for enumeration of each element within a <see cref="System.ReadOnlySpan{T}"/>
+        /// that has been split using a provided separator.
+        /// </summary>
         public ref struct SpanSplitEnumerator<T> where T : IEquatable<T>
         {
             private readonly ReadOnlySpan<T> _span;
@@ -41,8 +77,16 @@ namespace System
             private int _endCurrent = 0;
             private int _startNext = 0;
 
+            /// <summary>
+            /// Returns an enumerator that allows for iteration over the split span.
+            /// </summary>
+            /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/> that can be used to iterate over the split span.</returns>
             public SpanSplitEnumerator<T> GetEnumerator() => this;
 
+            /// <summary>
+            /// Returns the current element of the enumeration.
+            /// </summary>
+            /// <returns>Returns a <see cref="System.Range"/> instance that indicates the bounds of the current element withing the source span.</returns>
             public Range Current => new Range(_startCurrent, _endCurrent);
 
             internal SpanSplitEnumerator(ReadOnlySpan<T> span, SearchValues<T> searchValues)
@@ -71,6 +115,10 @@ namespace System
                 _splitMode = SpanSplitEnumeratorMode.SingleToken;
             }
 
+            /// <summary>
+            /// Advances the enumerator to the next element of the enumeration.
+            /// </summary>
+            /// <returns><see langword="true"/> if the enumerator was successfully advanced to the next element; <see langword="false"/> if the enumerator has passed the end of the enumeration.</returns>
             public bool MoveNext()
             {
                 if (_splitMode is SpanSplitEnumeratorMode.None || _startNext > _span.Length)
