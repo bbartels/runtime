@@ -16,17 +16,18 @@ namespace System
         public static SpanSplitEnumerator<T> SplitAny<T>(this ReadOnlySpan<T> source, SearchValues<T> separators)
             where T : IEquatable<T> => new SpanSplitEnumerator<T>(source, separators);
 
+        private enum SpanSplitEnumeratorMode
+        {
+            None = 0,
+            SingleToken,
+            Sequence,
+            EmptySequence,
+            Any,
+            SearchValues
+        }
+
         public ref struct SpanSplitEnumerator<T> where T : IEquatable<T>
         {
-            private enum SplitMode
-            {
-                None = 0,
-                SingleToken,
-                Sequence,
-                Any,
-                SearchValues
-            }
-
             private readonly ReadOnlySpan<T> _span;
 
             private readonly T _separator = default!;
@@ -34,9 +35,7 @@ namespace System
             private readonly SearchValues<T> _searchValues = default!;
 
             private readonly int _separatorLength;
-            private readonly SplitMode _splitMode;
-
-            private readonly bool _isInitialized = true;
+            private readonly SpanSplitEnumeratorMode _splitMode;
 
             private int _startCurrent = 0;
             private int _endCurrent = 0;
@@ -49,8 +48,7 @@ namespace System
             internal SpanSplitEnumerator(ReadOnlySpan<T> span, SearchValues<T> searchValues)
             {
                 _span = span;
-                _separatorLength = 1;
-                _splitMode = SplitMode.SearchValues;
+                _splitMode = SpanSplitEnumeratorMode.SearchValues;
                 _searchValues = searchValues;
             }
 
@@ -58,37 +56,37 @@ namespace System
             {
                 _span = span;
                 _separatorBuffer = separator;
-                _separatorLength = (_separatorBuffer.Length, treatAsSingleSeparator) switch
+                _splitMode = (separator.Length, treatAsSingleSeparator) switch
                 {
-                    (0, true) or (_, false) => 1,
-                    _ => separator.Length
+                    (0, true) => SpanSplitEnumeratorMode.EmptySequence,
+                    (_, true) => SpanSplitEnumeratorMode.Sequence,
+                    _ => SpanSplitEnumeratorMode.Any
                 };
-                _splitMode = treatAsSingleSeparator ? SplitMode.Sequence : SplitMode.Any;
             }
 
             internal SpanSplitEnumerator(ReadOnlySpan<T> span, T separator)
             {
                 _span = span;
                 _separator = separator;
-                _separatorLength = 1;
-                _splitMode = SplitMode.SingleToken;
+                _splitMode = SpanSplitEnumeratorMode.SingleToken;
             }
 
             public bool MoveNext()
             {
-                if (!_isInitialized || _startNext > _span.Length)
+                if (_splitMode is SpanSplitEnumeratorMode.None || _startNext > _span.Length)
                 {
                     return false;
                 }
 
                 ReadOnlySpan<T> slice = _span[_startNext..];
 
-                int separatorIndex = _splitMode switch
+                (int separatorIndex, int separatorLength) = _splitMode switch
                 {
-                    SplitMode.SingleToken => slice.IndexOf(_separator),
-                    SplitMode.Sequence => slice.IndexOf(_separatorBuffer),
-                    SplitMode.Any => slice.IndexOfAny(_separatorBuffer),
-                    SplitMode.SearchValues => _searchValues.IndexOfAny(_span),
+                    SpanSplitEnumeratorMode.SingleToken   => (slice.IndexOf(_separator), 1),
+                    SpanSplitEnumeratorMode.Sequence      => (slice.IndexOf(_separatorBuffer), _separatorBuffer.Length),
+                    SpanSplitEnumeratorMode.EmptySequence => (slice.IndexOf(_separatorBuffer), 1),
+                    SpanSplitEnumeratorMode.Any           => (slice.IndexOfAny(_separatorBuffer), 1),
+                    SpanSplitEnumeratorMode.SearchValues  => (_searchValues.IndexOfAny(_span), 1),
                     _ => throw new UnreachableException()
                 };
 
@@ -96,7 +94,7 @@ namespace System
 
                 _startCurrent = _startNext;
                 _endCurrent = _startCurrent + elementLength;
-                _startNext = _endCurrent + _separatorLength;
+                _startNext = _endCurrent + separatorLength;
                 return true;
             }
         }
