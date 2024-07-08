@@ -51,7 +51,7 @@ namespace System
         private enum SpanSplitEnumeratorMode
         {
             None = 0,
-            SingleToken,
+            SingleElement,
             Sequence,
             EmptySequence,
             Any,
@@ -112,7 +112,7 @@ namespace System
             {
                 _span = span;
                 _separator = separator;
-                _splitMode = SpanSplitEnumeratorMode.SingleToken;
+                _splitMode = SpanSplitEnumeratorMode.SingleElement;
             }
 
             /// <summary>
@@ -128,14 +128,14 @@ namespace System
 
                 ReadOnlySpan<T> slice = _span[_startNext..];
 
+                Debug.Assert(_splitmode is not SpanSplitEnumerator.None);
                 (int separatorIndex, int separatorLength) = _splitMode switch
                 {
-                    SpanSplitEnumeratorMode.SingleToken   => (slice.IndexOf(_separator), 1),
-                    SpanSplitEnumeratorMode.Sequence      => (slice.IndexOf(_separatorBuffer), _separatorBuffer.Length),
+                    SpanSplitEnumeratorMode.SingleElement => (slice.IndexOf(_separator), 1),
+                    SpanSplitEnumeratorMode.Sequence => (slice.IndexOf(_separatorBuffer), _separatorBuffer.Length),
                     SpanSplitEnumeratorMode.EmptySequence => (slice.IndexOf(_separatorBuffer), 1),
-                    SpanSplitEnumeratorMode.Any           => (slice.IndexOfAny(_separatorBuffer), 1),
-                    SpanSplitEnumeratorMode.SearchValues  => (_searchValues.IndexOfAny(slice), 1),
-                    _ => throw new UnreachableException()
+                    SpanSplitEnumeratorMode.Any => (slice.IndexOfAny(_separatorBuffer), 1),
+                    _ => (_searchValues.IndexOfAny(slice), 1)
                 };
 
                 int elementLength = (separatorIndex != -1 ? separatorIndex : slice.Length);
