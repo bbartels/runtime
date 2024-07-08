@@ -134,7 +134,7 @@ namespace System
                     SpanSplitEnumeratorMode.Sequence      => (slice.IndexOf(_separatorBuffer), _separatorBuffer.Length),
                     SpanSplitEnumeratorMode.EmptySequence => (slice.IndexOf(_separatorBuffer), 1),
                     SpanSplitEnumeratorMode.Any           => (slice.IndexOfAny(_separatorBuffer), 1),
-                    SpanSplitEnumeratorMode.SearchValues  => (_searchValues.IndexOfAny(_span), 1),
+                    SpanSplitEnumeratorMode.SearchValues  => (_searchValues.IndexOfAny(slice), 1),
                     _ => throw new UnreachableException()
                 };
 
