@@ -70,7 +70,6 @@ namespace System
             private readonly ReadOnlySpan<T> _separatorBuffer;
             private readonly SearchValues<T> _searchValues = default!;
 
-            private readonly int _separatorLength;
             private readonly SpanSplitEnumeratorMode _splitMode;
 
             private int _startCurrent = 0;
