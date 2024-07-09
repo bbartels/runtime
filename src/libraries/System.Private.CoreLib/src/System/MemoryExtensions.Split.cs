@@ -127,7 +127,7 @@ namespace System
 
                 ReadOnlySpan<T> slice = _span[_startNext..];
 
-                Debug.Assert(_splitmode is not SpanSplitEnumerator.None);
+                Debug.Assert(_splitMode is not SpanSplitEnumeratorMode.None);
                 (int separatorIndex, int separatorLength) = _splitMode switch
                 {
                     SpanSplitEnumeratorMode.SingleElement => (slice.IndexOf(_separator), 1),
