@@ -132,7 +132,7 @@ namespace System
                 {
                     SpanSplitEnumeratorMode.SingleElement => (slice.IndexOf(_separator), 1),
                     SpanSplitEnumeratorMode.Sequence => (slice.IndexOf(_separatorBuffer), _separatorBuffer.Length),
-                    SpanSplitEnumeratorMode.EmptySequence => (slice.IndexOf(_separatorBuffer), 1),
+                    SpanSplitEnumeratorMode.EmptySequence => (-1, 1),
                     SpanSplitEnumeratorMode.Any => (slice.IndexOfAny(_separatorBuffer), 1),
                     _ => (_searchValues.IndexOfAny(slice), 1)
                 };
