@@ -217,7 +217,7 @@ namespace System
                         break;
                 }
 
-                Debug.Assert(_endCurrent < 0 && _startCurrent != 0, "On first iteration of MoveNext() _startCurrent should be 0");
+                Debug.Assert((_endCurrent >= 0) || (_startCurrent == 0), "On first iteration of MoveNext() _startCurrent should be 0");
 
                 if (separatorIndex >= 0)
                 {
