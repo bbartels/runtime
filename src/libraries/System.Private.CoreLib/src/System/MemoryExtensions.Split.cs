@@ -115,7 +115,7 @@ namespace System
             /// <summary>The inclusive starting index in <see cref="_span"/> of the current range.</summary>
             private int _startCurrent = 0;
             /// <summary>The exclusive ending index in <see cref="_span"/> of the current range.</summary>
-            private int _endCurrent = 0;
+            private int _endCurrent = -1;
 
             /// <summary>Gets an enumerator that allows for iteration over the split span.</summary>
             /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/> that can be used to iterate over the split span.</returns>
@@ -165,6 +165,7 @@ namespace System
                 _splitMode = separator.Length == 0 ?
                     SpanSplitEnumeratorMode.EmptySequence :
                     SpanSplitEnumeratorMode.Sequence;
+                _endCurrent = Math.Min(-1, -separator.Length);
             }
 
             /// <summary>Initializes the enumerator for <see cref="SpanSplitEnumeratorMode.SingleElement"/>.</summary>
@@ -221,6 +222,7 @@ namespace System
                 }
                 else
                 {
+                    _endCurrent = _span.Length;
                     // Set _splitMode to None so that subsequent MoveNext calls will return false.
                     _splitMode = SpanSplitEnumeratorMode.None;
                 }
