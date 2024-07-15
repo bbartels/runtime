@@ -165,6 +165,7 @@ namespace System
                 _splitMode = separator.Length == 0 ?
                     SpanSplitEnumeratorMode.EmptySequence :
                     SpanSplitEnumeratorMode.Sequence;
+                // _endCurrent needs to be adjusted such that after first call to MoveNext() _startCurrent is 0
                 _endCurrent = Math.Min(-1, -separator.Length);
             }
 
@@ -215,6 +216,8 @@ namespace System
                         separatorIndex = _span.Slice(_startCurrent).IndexOfAny(_searchValues);
                         break;
                 }
+
+                Debug.Assert(_endCurrent < 0 && _startCurrent != 0, "On first iteration of MoveNext() _startCurrent should be 0");
 
                 if (separatorIndex >= 0)
                 {
