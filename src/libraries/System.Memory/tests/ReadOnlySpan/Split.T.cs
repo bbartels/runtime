@@ -208,7 +208,15 @@ namespace System.SpanTests
 
         private static void AssertEnsureCorrectEnumeration<T>(MemoryExtensions.SpanSplitEnumerator<T> enumerator, Range[] result) where T : IEquatable<T>
         {
+            // Assert.Throws would not work due to the requirement to capture the ref struct
+            try
+            {
+                _ = enumerator.Current;
+                Assert.Fail("enumerator.Current is not valid until the first call to MoveNext()");
+            }
+            catch (ArgumentOutOfRangeException) { }
             Assert.True(enumerator.MoveNext());
+
             foreach ((Range r, int index) in result.Select((e, i) => (e, i)))
             {
                 Assert.Equal(r, enumerator.Current);
