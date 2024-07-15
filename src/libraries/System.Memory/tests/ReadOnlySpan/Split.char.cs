@@ -2,260 +2,217 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
-using SpanSplitEnumerator = System.MemoryExtensions.SpanSplitEnumerator<char>;
 
 namespace System.SpanTests
 {
     public static partial class ReadOnlySpanTests
     {
-        [Fact]
-        public static void SplitNoMatchSingleResult()
-        {
-            ReadOnlySpan<char> value = "a b";
-
-            string expected = value.ToString();
-            var enumerator = value.Split(',');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(expected, value[enumerator.Current].ToString());
-        }
+        public record struct CustomStruct(int value) : IEquatable<CustomStruct>;
+        public record class CustomClass(int value) : IEquatable<CustomClass>;
 
         [Fact]
-        public static void DefaultSpanSplitEnumeratorBehavior()
+        public static void DefaultSpanSplitEnumeratorBehaviour()
         {
-            var charSpanEnumerator = new SpanSplitEnumerator();
+            var charSpanEnumerator = new MemoryExtensions.SpanSplitEnumerator<char>();
             Assert.Equal(new Range(0, 0), charSpanEnumerator.Current);
             Assert.False(charSpanEnumerator.MoveNext());
 
             // Implicit DoesNotThrow assertion
             charSpanEnumerator.GetEnumerator();
 
-            var stringSpanEnumerator = new SpanSplitEnumerator();
+            var stringSpanEnumerator = new MemoryExtensions.SpanSplitEnumerator<char>();
             Assert.Equal(new Range(0, 0), stringSpanEnumerator.Current);
             Assert.False(stringSpanEnumerator.MoveNext());
             stringSpanEnumerator.GetEnumerator();
         }
 
-        [Fact]
-        public static void ValidateArguments_OverloadWithoutSeparator()
-        {
-            ReadOnlySpan<char> buffer = default;
+        public static IEnumerable<object[]> SplitSingleElementSeparatorData =>
+        [
+            // Split on default
+            [ (char[])['a', ' ', 'b'], default(char), (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3], default(int),        (Range[])[0..3] ],
+            [ (long[])[1, 2, 3], default(long),       (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3], default(byte),       (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], default(CustomStruct), (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  default(CustomClass),  (Range[])[0..3] ],
 
-            var enumerator = buffer.Split(' ');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(0, 0), enumerator.Current);
-            Assert.False(enumerator.MoveNext());
+            // Split no matching element
+            [ (char[])['a', ' ', 'b'], ',', (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3], (int)4,    (Range[])[0..3] ],
+            [ (long[])[1, 2, 3], (long)4,   (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3], (byte)4,   (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], new CustomStruct(4), (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  new CustomClass(4),  (Range[])[0..3] ],
 
-            buffer = "";
-            enumerator = buffer.Split(' ');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(0, 0), enumerator.Current);
-            Assert.False(enumerator.MoveNext());
+            // Split on sequence containing only a separator
+            [ (char[])[','], ',',     (Range[])[0..0, 1..1] ],
+            [ (int[]) [1], (int)1,    (Range[])[0..0, 1..1] ],
+            [ (long[])[1], (long)1,   (Range[])[0..0, 1..1] ],
+            [ (byte[])[1], (byte)1,   (Range[])[0..0, 1..1] ],
+            [ (CustomStruct[])[new(1)], new CustomStruct(1), (Range[])[0..0, 1..1] ],
+            [ (CustomClass[]) [new(1)], new CustomClass(1),  (Range[])[0..0, 1..1] ],
 
-            buffer = " ";
-            enumerator = buffer.Split(' ');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(0, 0), enumerator.Current);
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(1, 1), enumerator.Current);
-            Assert.False(enumerator.MoveNext());
-        }
+            // Split on empty sequence with default separator
+            [ (char[])[], default(char), (Range[])[0..0] ],
+            [ (int[]) [], default(int),  (Range[])[0..0] ],
+            [ (long[])[], default(long), (Range[])[0..0] ],
+            [ (byte[])[], default(byte), (Range[])[0..0] ],
+            [ (CustomStruct[])[], default(CustomStruct), (Range[])[0..0] ],
+            [ (CustomClass[]) [], default(CustomClass),  (Range[])[0..0] ],
 
-        [Fact]
-        public static void ValidateArguments_OverloadWithROSSeparator()
-        {
-            // Default buffer
-            ReadOnlySpan<char> buffer = default;
+            [ (char[])['a', ',', 'b'], ',', (Range[]) [ 0..1, 2..3 ] ],
+            [ (int[]) [1, 2, 3], (int)2,    (Range[]) [ 0..1, 2..3 ] ],
+            [ (long[])[1, 2, 3], (long)2,   (Range[]) [ 0..1, 2..3 ] ],
+            [ (byte[])[1, 2, 3], (byte)2,   (Range[]) [ 0..1, 2..3 ] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], new CustomStruct(2), (Range[]) [ 0..1, 2..3 ] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  new CustomClass(2),  (Range[]) [ 0..1, 2..3 ] ],
 
-            var enumerator = buffer.Split(default(char));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(' ');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            // Empty buffer
-            buffer = "";
-
-            enumerator = buffer.Split(default(char));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(' ');
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            // Single whitespace buffer
-            buffer = " ";
-
-            enumerator = buffer.Split(default(char));
-            Assert.True(enumerator.MoveNext());
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(' ');
-            Assert.Equal(new Range(0, 0), enumerator.Current);
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(0, 0), enumerator.Current);
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(new Range(1, 1), enumerator.Current);
-            Assert.False(enumerator.MoveNext());
-        }
-
-        [Fact]
-        public static void ValidateArguments_OverloadWithStringSeparator()
-        {
-            // Default buffer
-            ReadOnlySpan<char> buffer = default;
-
-            var enumerator = buffer.Split(null); // null is treated as empty string
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split("");
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(" ");
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            // Empty buffer
-            buffer = "";
-
-            enumerator = buffer.Split(null);
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split("");
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(" ");
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.False(enumerator.MoveNext());
-
-            // Single whitespace buffer
-            buffer = " ";
-
-            enumerator = buffer.Split(null); // null is treated as empty string
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(1, 1));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split("");
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(1, 1));
-            Assert.False(enumerator.MoveNext());
-
-            enumerator = buffer.Split(" ");
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(0, 0));
-            Assert.True(enumerator.MoveNext());
-            Assert.Equal(enumerator.Current, new Range(1, 1));
-            Assert.False(enumerator.MoveNext());
-        }
+            [ (char[])['a', 'b', ',', ','], ',', (Range[]) [ 0..2, 3..3, 4..4 ] ],
+            [ (int[]) [1, 3, 2, 2], (int)2,      (Range[]) [ 0..2, 3..3, 4..4 ] ],
+            [ (long[])[1, 3, 2, 2], (long)2,     (Range[]) [ 0..2, 3..3, 4..4 ] ],
+            [ (byte[])[1, 3, 2, 2], (byte)2,     (Range[]) [ 0..2, 3..3, 4..4 ] ],
+            [ (CustomStruct[])[new(1), new(3), new(2), new(2)], new CustomStruct(2), (Range[]) [ 0..2, 3..3, 4..4 ] ],
+            [ (CustomClass[])[new(1), new(3), new(2), new(2)],  new CustomClass(2),  (Range[]) [ 0..2, 3..3, 4..4 ] ],
+        ];
 
         [Theory]
-        [InlineData("", ',', new[] { "" })]
-        [InlineData(" ", ' ', new[] { "", "" })]
-        [InlineData(",", ',', new[] { "", "" })]
-        [InlineData("     ", ' ', new[] { "", "", "", "", "", "" })]
-        [InlineData(",,", ',', new[] { "", "", "" })]
-        [InlineData("ab", ',', new[] { "ab" })]
-        [InlineData("a,b", ',', new[] { "a", "b" })]
-        [InlineData("a,", ',', new[] { "a", "" })]
-        [InlineData(",b", ',', new[] { "", "b" })]
-        [InlineData(",a,b", ',', new[] { "", "a", "b" })]
-        [InlineData("a,b,", ',', new[] { "a", "b", "" })]
-        [InlineData("a,b,c", ',', new[] { "a", "b", "c" })]
-        [InlineData("a,,c", ',', new[] { "a", "", "c" })]
-        [InlineData(",a,b,c", ',', new[] { "", "a", "b", "c" })]
-        [InlineData("a,b,c,", ',', new[] { "a", "b", "c", "" })]
-        [InlineData(",a,b,c,", ',', new[] { "", "a", "b", "c", "" })]
-        [InlineData("first,second", ',', new[] { "first", "second" })]
-        [InlineData("first,", ',', new[] { "first", "" })]
-        [InlineData(",second", ',', new[] { "", "second" })]
-        [InlineData(",first,second", ',', new[] { "", "first", "second" })]
-        [InlineData("first,second,", ',', new[] { "first", "second", "" })]
-        [InlineData("first,second,third", ',', new[] { "first", "second", "third" })]
-        [InlineData("first,,third", ',', new[] { "first", "", "third" })]
-        [InlineData(",first,second,third", ',', new[] { "", "first", "second", "third" })]
-        [InlineData("first,second,third,", ',', new[] { "first", "second", "third", "" })]
-        [InlineData(",first,second,third,", ',', new[] { "", "first", "second", "third", "" })]
-        [InlineData("Foo Bar Baz", ' ', new[] { "Foo", "Bar", "Baz" })]
-        [InlineData("Foo Bar Baz ", ' ', new[] { "Foo", "Bar", "Baz", "" })]
-        [InlineData(" Foo Bar Baz ", ' ', new[] { "", "Foo", "Bar", "Baz", "" })]
-        [InlineData(" Foo  Bar Baz ", ' ', new[] { "", "Foo", "", "Bar", "Baz", "" })]
-        [InlineData("Foo Baz Bar", default(char), new[] { "Foo Baz Bar" })]
-        [InlineData("Foo Baz \x0000 Bar", default(char), new[] { "Foo Baz ", " Bar" })]
-        [InlineData("Foo Baz \x0000 Bar\x0000", default(char), new[] { "Foo Baz ", " Bar", "" })]
-        public static void SpanSplitCharSeparator(string valueParam, char separator, string[] expectedParam)
+        [MemberData(nameof(SplitSingleElementSeparatorData))]
+        public static void Split_SingleElementSeparator<T>(T[] value, T separator, Range[] result) where T : IEquatable<T>
         {
-            char[][] expected = expectedParam.Select(x => x.ToCharArray()).ToArray();
-            AssertEqual(expected, valueParam, valueParam.AsSpan().Split(separator));
+            AssertEnsureCorrectEnumeration(new ReadOnlySpan<T>(value).Split(separator), result);
         }
+
+        public static IEnumerable<object[]> SplitSequenceSeparatorData =>
+        [
+            // Split no separators
+            [ (char[])['a', ' ', 'b'], (char[])[],      (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3],       (int[]) [],      (Range[])[0..3] ],
+            [ (long[])[1, 2, 3],       (long[])[],      (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3],       (byte[])[],      (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], (CustomStruct[])[], (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  (CustomClass[])[],  (Range[])[0..3] ],
+
+            // Split no matching elements
+            [ (char[])['a', ' ', 'b'], (char[])[',', '.' ], (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3],       (int[]) [4, 3],      (Range[])[0..3] ],
+            [ (long[])[1, 2, 3],       (long[])[4, 3],      (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3],       (byte[])[4, 3],      (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], (CustomStruct[])[new(4), new(3)], (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  (CustomClass[])[new(4), new(3)],  (Range[])[0..3] ],
+
+            // Split on input span with only a single sequence separator
+            [ (char[])[',', '.'], (char[])[',', '.' ], (Range[])[0..0, 2..2] ],
+            [ (int[]) [4, 3],     (int[]) [4, 3],      (Range[])[0..0, 2..2] ],
+            [ (long[])[4, 3],     (long[])[4, 3],      (Range[])[0..0, 2..2] ],
+            [ (byte[])[4, 3],     (byte[])[4, 3],      (Range[])[0..0, 2..2] ],
+            [ (CustomStruct[])[new(4), new(3)], (CustomStruct[])[new(4), new(3)], (Range[])[0..0, 2..2] ],
+            [ (CustomClass[])[new(4), new(3)],  (CustomClass[])[new(4), new(3)],  (Range[])[0..0, 2..2] ],
+
+            // Split on empty sequence with default separator
+            [ (char[])[], (char[])[default(char)], (Range[])[0..0] ],
+            [ (int[]) [], (int[]) [default(int)],  (Range[])[0..0] ],
+            [ (long[])[], (long[])[default(long)], (Range[])[0..0] ],
+            [ (byte[])[], (byte[])[default(byte)], (Range[])[0..0] ],
+            [ (CustomStruct[])[], (CustomStruct[])[default], (Range[])[0..0] ],
+            [ (CustomClass[]) [], (CustomClass[])[default],  (Range[])[0..0] ],
+
+            [ (char[])['a', ',', '-', 'b'], (char[])[',', '-'], (Range[]) [ 0..1, 3..4 ] ],
+            [ (int[]) [1, 2, 4, 3], (int[])[2, 4],    (Range[]) [ 0..1, 3..4 ] ],
+            [ (long[])[1, 2, 4, 3], (long[])[2, 4],   (Range[]) [ 0..1, 3..4 ] ],
+            [ (byte[])[1, 2, 4, 3], (byte[])[2, 4],   (Range[]) [ 0..1, 3..4 ] ],
+            [ (CustomStruct[])[new(1), new(2), new(4), new(3)], (CustomStruct[]) [new(2), new(4)], (Range[]) [ 0..1, 3..4 ] ],
+            [ (CustomClass[])[new(1), new(2), new(4), new(3)], (CustomClass[])[new(2), new(4)],  (Range[]) [ 0..1, 3..4 ] ],
+
+            [ (char[])[',', '-', 'a', ',', '-', 'b'], (char[])[',', '-'], (Range[]) [ 0..0, 2..3, 5..6 ] ],
+            [ (int[]) [2, 4, 3, 2, 4, 5],             (int[]) [2, 4],     (Range[]) [ 0..0, 2..3, 5..6 ] ],
+            [ (long[])[2, 4, 3, 2, 4, 5],             (long[])[2, 4],     (Range[]) [ 0..0, 2..3, 5..6 ] ],
+            [ (byte[])[2, 4, 3, 2, 4, 5],             (byte[])[2, 4],     (Range[]) [ 0..0, 2..3, 5..6 ] ],
+            [ (CustomStruct[])[new(2), new(4), new(3), new(2), new(4), new(5)], (CustomStruct[]) [new(2), new(4)], (Range[]) [ 0..0, 2..3, 5..6 ] ],
+            [ (CustomClass[])[new(2), new(4), new(3), new(2), new(4), new(5)],  (CustomClass[])[new(2), new(4)],  (Range[]) [ 0..0, 2..3, 5..6 ] ],
+        ];
 
         [Theory]
-        [InlineData("", new[] { "" })]
-        [InlineData(" ", new[] { "", "" })]
-        [InlineData("     ", new[] { "", "", "", "", "", "" })]
-        [InlineData("  ", new[] { "", "", "" })]
-        [InlineData("ab", new[] { "ab" })]
-        [InlineData("a b", new[] { "a", "b" })]
-        [InlineData("a ", new[] { "a", "" })]
-        [InlineData(" b", new[] { "", "b" })]
-        [InlineData("Foo Bar Baz", new[] { "Foo", "Bar", "Baz" })]
-        [InlineData("Foo Bar Baz ", new[] { "Foo", "Bar", "Baz", "" })]
-        [InlineData(" Foo Bar Baz ", new[] { "", "Foo", "Bar", "Baz", "" })]
-        [InlineData(" Foo  Bar Baz ", new[] { "", "Foo", "", "Bar", "Baz", "" })]
-        public static void SpanSplitDefaultCharSeparator(string valueParam, string[] expectedParam)
+        [MemberData(nameof(SplitSequenceSeparatorData))]
+        public static void Split_SequenceSeparator<T>(T[] value, T[] separator, Range[] result) where T : IEquatable<T>
         {
-            char[][] expected = expectedParam.Select(x => x.ToCharArray()).ToArray();
-            AssertEqual(expected, valueParam, valueParam.AsSpan().Split(' '));
+            AssertEnsureCorrectEnumeration(new ReadOnlySpan<T>(value).Split(separator), result);
         }
+
+        public static IEnumerable<object[]> SplitAnySeparatorData =>
+        [
+            // Split no separators
+            [ (char[])['a', ' ', 'b'], (char[])[],      (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3],       (int[]) [],      (Range[])[0..3] ],
+            [ (long[])[1, 2, 3],       (long[])[],      (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3],       (byte[])[],      (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], (CustomStruct[])[], (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  (CustomClass[])[],  (Range[])[0..3] ],
+
+            // Split non-matching separators
+            [ (char[])['a', ' ', 'b'], (char[])[',', '.' ], (Range[])[0..3] ],
+            [ (int[]) [1, 2, 3],       (int[]) [4, 5],      (Range[])[0..3] ],
+            [ (long[])[1, 2, 3],       (long[])[4, 5],      (Range[])[0..3] ],
+            [ (byte[])[1, 2, 3],       (byte[])[4, 5],      (Range[])[0..3] ],
+            [ (CustomStruct[])[new(1), new(2), new(3)], (CustomStruct[])[new(4), new(5)], (Range[])[0..3] ],
+            [ (CustomClass[])[new(1), new(2), new(3)],  (CustomClass[])[new(4), new(5)],  (Range[])[0..3] ],
+
+            // Split on sequence containing only a separator
+            [ (char[])[','], (char[])[','], (Range[])[0..0, 1..1] ],
+            [ (int[]) [1],   (int[]) [1],   (Range[])[0..0, 1..1] ],
+            [ (long[])[1],   (long[])[1],   (Range[])[0..0, 1..1] ],
+            [ (byte[])[1],   (byte[])[1],   (Range[])[0..0, 1..1] ],
+            [ (CustomStruct[])[new(1)], (CustomStruct[])[new(1)], (Range[])[0..0, 1..1] ],
+            [ (CustomClass[]) [new(1)], (CustomClass[])[new(1)],  (Range[])[0..0, 1..1] ],
+
+            // Split on empty sequence with default separator
+            [ (char[])[], (char[])[default(char)], (Range[])[0..0] ],
+            [ (int[]) [], (int[]) [default(int)],  (Range[])[0..0] ],
+            [ (long[])[], (long[])[default(long)], (Range[])[0..0] ],
+            [ (byte[])[], (byte[])[default(byte)], (Range[])[0..0] ],
+            [ (CustomStruct[])[], (CustomStruct[])[new(default)], (Range[])[0..0] ],
+            [ (CustomClass[]) [], (CustomClass[])[new(default)],  (Range[])[0..0] ],
+
+            [ (char[])['a', ',', '-', 'b'], (char[])[',', '-'], (Range[]) [ 0..1, 2..2, 3..4 ] ],
+            [ (int[]) [1, 2, 4, 3], (int[])[2, 4],    (Range[]) [ 0..1, 2..2, 3..4 ] ],
+            [ (long[])[1, 2, 4, 3], (long[])[2, 4],   (Range[]) [ 0..1, 2..2, 3..4 ] ],
+            [ (byte[])[1, 2, 4, 3], (byte[])[2, 4],   (Range[]) [ 0..1, 2..2, 3..4 ] ],
+            [ (CustomStruct[])[new(1), new(2), new(4), new(3)], (CustomStruct[]) [new(2), new(4)], (Range[]) [ 0..1, 2..2, 3..4 ] ],
+            [ (CustomClass[])[new(1), new(2), new(4), new(3)], (CustomClass[])[new(2), new(4)],  (Range[]) [ 0..1, 2..2, 3..4 ] ],
+
+            [ (char[])[',', '-', 'a', ',', '-', 'b'], (char[])[',', '-'], (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+            [ (int[]) [2, 4, 3, 2, 4, 5],             (int[]) [2, 4],     (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+            [ (long[])[2, 4, 3, 2, 4, 5],             (long[])[2, 4],     (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+            [ (byte[])[2, 4, 3, 2, 4, 5],             (byte[])[2, 4],     (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+            [ (CustomStruct[])[new(2), new(4), new(3), new(2), new(4), new(5)], (CustomStruct[]) [new(2), new(4)], (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+            [ (CustomClass[])[new(2), new(4), new(3), new(2), new(4), new(5)],  (CustomClass[])[new(2), new(4)],  (Range[]) [ 0..0, 1..1, 2..3, 4..4, 5..6 ] ],
+        ];
 
         [Theory]
-        [InlineData(" Foo Bar Baz,", ", ", new[] { " Foo Bar Baz," })]
-        [InlineData(" Foo Bar Baz, ", ", ", new[] { " Foo Bar Baz", "" })]
-        [InlineData(", Foo Bar Baz, ", ", ", new[] { "", "Foo Bar Baz", "" })]
-        [InlineData(", Foo, Bar, Baz, ", ", ", new[] { "", "Foo", "Bar", "Baz", "" })]
-        [InlineData(", , Foo Bar, Baz", ", ", new[] { "", "", "Foo Bar", "Baz" })]
-        [InlineData(", , Foo Bar, Baz, , ", ", ", new[] { "", "", "Foo Bar", "Baz", "", "" })]
-        [InlineData(", , , , , ", ", ", new[] { "", "", "", "", "", "" })]
-        [InlineData("     ", " ", new[] { "", "", "", "", "", "" })]
-        [InlineData("  Foo, Bar  Baz  ", "  ", new[] { "", "Foo, Bar", "Baz", "" })]
-        public static void SpanSplitStringSeparator(string valueParam, string separator, string[] expectedParam)
+        [MemberData(nameof(SplitAnySeparatorData))]
+        public static void Split_AnySingleElementSeparator<T>(T[] value, T[] separator, Range[] result) where T : IEquatable<T>
         {
-            char[][] expected = expectedParam.Select(x => x.ToCharArray()).ToArray();
-            AssertEqual(expected, valueParam, valueParam.AsSpan().Split(separator));
-        }
+            AssertEnsureCorrectEnumeration(new ReadOnlySpan<T>(value).SplitAny(separator), result);
 
-        private static void AssertEqual<T>(T[][] items, ReadOnlySpan<T> orig, MemoryExtensions.SpanSplitEnumerator<T> source) where T : IEquatable<T>
-        {
-            foreach (var item in items)
+            if (value is char[] source && separator is char[] separators)
             {
-                Assert.True(source.MoveNext());
-                var slice = orig[source.Current];
-                Assert.Equal(item, slice.ToArray());
+                var charEnumerator = new ReadOnlySpan<char>(source).SplitAny(SearchValues.Create(separators));
+                AssertEnsureCorrectEnumeration(charEnumerator, result);
             }
-            Assert.False(source.MoveNext());
+        }
+
+        private static void AssertEnsureCorrectEnumeration<T>(MemoryExtensions.SpanSplitEnumerator<T> enumerator, Range[] result) where T : IEquatable<T>
+        {
+            foreach ((Range r, int index) in ((Range[])[0..0]).Concat(result).Select((e, i) => (e, i)))
+            {
+                Assert.Equal(r, enumerator.Current);
+                if (index < result.Length)
+                    Assert.True(enumerator.MoveNext());
+            }
+            Assert.False(enumerator.MoveNext());
         }
     }
 }

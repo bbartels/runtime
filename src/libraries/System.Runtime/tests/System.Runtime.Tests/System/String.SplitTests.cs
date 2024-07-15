@@ -646,7 +646,8 @@ namespace System.Tests
             Assert.Equal(expected.Length, value.AsSpan().SplitAny(ranges, separators, options));
             Assert.Equal(expected, ranges.Take(expected.Length).Select(r => value[r]).ToArray());
 
-            if (count == int.MaxValue && options is StringSplitOptions.None && separators is { Length: > 0})
+            // The SpanSplitEnumerator does not replicate the behaviour of splitting on a whitespace char when input char[] is null or empty.
+            if (count == int.MaxValue && options is StringSplitOptions.None && separators is { Length: > 0 })
             {
                 AssertEqual(expected, value.AsSpan(), value.AsSpan().SplitAny(separators));
                 AssertEqual(expected, value.AsSpan(), value.AsSpan().SplitAny(Buffers.SearchValues.Create(separators)));
