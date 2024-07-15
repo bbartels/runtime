@@ -116,8 +116,6 @@ namespace System
             private int _startCurrent = 0;
             /// <summary>The exclusive ending index in <see cref="_span"/> of the current range.</summary>
             private int _endCurrent = 0;
-            /// <summary>The index in <see cref="_span"/> from which the next separator search should start.</summary>
-            private int _startNext = 0;
 
             /// <summary>Gets an enumerator that allows for iteration over the split span.</summary>
             /// <returns>Returns a <see cref="System.MemoryExtensions.SpanSplitEnumerator{T}"/> that can be used to iterate over the split span.</returns>
@@ -184,49 +182,45 @@ namespace System
             public bool MoveNext()
             {
                 // Search for the next separator index.
-                int separatorIndex, separatorLength;
+                int separatorIndex;
                 switch (_splitMode)
                 {
                     case SpanSplitEnumeratorMode.None:
                         return false;
 
                     case SpanSplitEnumeratorMode.SingleElement:
-                        separatorIndex = _span.Slice(_startNext).IndexOf(_separator);
-                        separatorLength = 1;
+                        _startCurrent = _endCurrent + 1;
+                        separatorIndex = _span.Slice(_startCurrent).IndexOf(_separator);
                         break;
 
                     case SpanSplitEnumeratorMode.Any:
-                        separatorIndex = _span.Slice(_startNext).IndexOfAny(_separatorBuffer);
-                        separatorLength = 1;
+                        _startCurrent = _endCurrent + 1;
+                        separatorIndex = _span.Slice(_startCurrent).IndexOfAny(_separatorBuffer);
                         break;
 
                     case SpanSplitEnumeratorMode.Sequence:
-                        separatorIndex = _span.Slice(_startNext).IndexOf(_separatorBuffer);
-                        separatorLength = _separatorBuffer.Length;
+                        _startCurrent = _endCurrent + _separatorBuffer.Length;
+                        separatorIndex = _span.Slice(_startCurrent).IndexOf(_separatorBuffer);
                         break;
 
                     case SpanSplitEnumeratorMode.EmptySequence:
+                        _startCurrent = _endCurrent + 1;
                         separatorIndex = -1;
-                        separatorLength = 1;
                         break;
 
                     default:
                         Debug.Assert(_splitMode == SpanSplitEnumeratorMode.SearchValues, $"Unknown split mode: {_splitMode}");
-                        separatorIndex = _span.Slice(_startNext).IndexOfAny(_searchValues);
-                        separatorLength = 1;
+                        _startCurrent = _endCurrent + 1;
+                        separatorIndex = _span.Slice(_startCurrent).IndexOfAny(_searchValues);
                         break;
                 }
 
-                _startCurrent = _startNext;
                 if (separatorIndex >= 0)
                 {
                     _endCurrent = _startCurrent + separatorIndex;
-                    _startNext = _endCurrent + separatorLength;
                 }
                 else
                 {
-                    _startNext = _endCurrent = _span.Length;
-
                     // Set _splitMode to None so that subsequent MoveNext calls will return false.
                     _splitMode = SpanSplitEnumeratorMode.None;
                 }
